@@ -1,0 +1,9 @@
+{
+  "format_version": "1.21.40",
+  "minecraft:atmosphere_settings": {
+    "description": { "identifier": "minecraft:default_atmospherics" },
+    "rayleigh_strength": 10.0,
+    "sky_zenith_color": { "0.0": [100, 130, 170], "0.5": [40, 40, 40] },
+    "sky_horizon_color": "#B7BDC6"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "format_version": "1.21.80",
+  "minecraft:lighting_settings": {
+    "description": { "identifier": "minecraft:future_biome_lighting" },
+    "ambient": { "color": "#FFFFFF", "illuminance": 0.02 }
+  }
+}

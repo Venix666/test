@@ -1,0 +1,9 @@
+{
+  "format_version": "1.21.40",
+  "minecraft:atmosphere_settings": {
+    "description": { "identifier": "minecraft:hell_atmospherics" },
+    "sky_zenith_color": { "0.0": [51, 8, 8], "1.0": [51, 8, 8] },
+    "sky_horizon_color": { "0.0": [51, 8, 8], "1.0": [51, 8, 8] },
+    "rayleigh_strength": 0.15
+  }
+}

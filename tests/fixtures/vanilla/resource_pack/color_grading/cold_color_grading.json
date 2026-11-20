@@ -1,0 +1,7 @@
+{
+  "format_version": "1.21.90",
+  "minecraft:color_grading_settings": {
+    "description": { "identifier": "minecraft:cold_color_grading" },
+    "color_grading": { "midtones": { "saturation": [1.0, 1.0, 1.0] } }
+  }
+}

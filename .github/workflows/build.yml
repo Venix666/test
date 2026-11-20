@@ -1,0 +1,23 @@
+name: build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pillow pytest
+      - run: ./tools/fetch_vanilla.sh
+      - run: python -m pytest -q
+      - run: python -m halcyon build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: halcyon-mcpacks
+          path: dist/*.mcpack

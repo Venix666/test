@@ -1,0 +1,12 @@
+{
+  // old 1.21.70 layout: sun/moon directly under directional_lights
+  "format_version": "1.21.70",
+  "minecraft:lighting_settings": {
+    "description": { "identifier": "minecraft:nether_lighting" },
+    "directional_lights": {
+      "sun": { "illuminance": { "0.0": 100.0, "1.0": 100.0 }, "color": { "0.0": [255, 255, 255], "1.0": [255, 255, 255] } },
+      "moon": { "illuminance": { "0.0": 100.0, "1.0": 100.0 }, "color": { "0.0": [255, 255, 255], "1.0": [255, 255, 255] } }
+    },
+    "ambient": { "color": "#FFFFFF", "illuminance": 0.5 }
+  }
+}
