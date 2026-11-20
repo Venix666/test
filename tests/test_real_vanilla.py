@@ -34,3 +34,20 @@ def test_every_biome_resolves_to_halcyon_settings(look, real_vanilla, caplog):
             ref = biome["components"].get(component, {}).get(field)
             if ref:
                 assert ref in provided[root], f"{biome['description']['identifier']} → {ref}"
+
+
+def test_pbr_texture_sets_only_reference_files_in_the_pack(real_vanilla):
+    import json
+
+    from halcyon import pbr
+
+    if not pbr.textures_root(real_vanilla).is_dir():
+        pytest.skip("run HALCYON_WITH_TEXTURES=1 tools/fetch_vanilla.sh")
+    files = pbr.generate(real_vanilla)
+    sets = {k: json.loads(v) for k, v in files.items() if k.endswith(".texture_set.json")}
+    assert len(sets) > 1000
+    stems = {k.rsplit(".", 1)[0] for k in files}
+    for path, doc in sets.items():
+        folder = path.rsplit("/", 1)[0]
+        for ref in doc["minecraft:texture_set"].values():
+            assert f"{folder}/{ref}" in stems, f"{path} → {ref}"

@@ -85,3 +85,54 @@ def render(look: Look, path: Path) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     img.save(path)
     return path
+
+
+PBR_SAMPLES = ["stone", "cobblestone", "stonebrick", "brick", "planks_oak", "log_oak", "sandstone",
+               "deepslate/cobbled_deepslate", "diamond_ore", "redstone_ore", "gold_ore", "leaves_oak", "glass"]
+
+
+def render_pbr(vanilla, path: Path, scale: int = 8) -> Path:
+    """Contact sheet per block: color | heightmap | flat-lit | lit with derived normals | ore glow."""
+    import numpy as np
+    from PIL import Image, ImageDraw
+
+    from .pbr import GLOW_ORES, find_image, heightmap, ore_mask, rule_for, textures_root
+
+    root = textures_root(vanilla)
+    light = np.array([-0.55, -0.6, 0.58])
+    light /= np.linalg.norm(light)
+    rows = []
+    for name in PBR_SAMPLES:
+        folder, base = (root / name).parent, (root / name).name
+        p = find_image(folder, base)
+        if p is None:
+            continue
+        rgba = np.array(Image.open(p).convert("RGBA"))[:16]  # first frame of animated strips
+        h = heightmap(rgba, rule_for(name)).astype(np.float32) / 255.0
+        dx = np.roll(h, -1, axis=1) - np.roll(h, 1, axis=1)
+        dy = np.roll(h, -1, axis=0) - np.roll(h, 1, axis=0)
+        n = np.dstack([-dx * 3.0, -dy * 3.0, np.ones_like(h)])
+        n /= np.linalg.norm(n, axis=-1, keepdims=True)
+        rgb = rgba[..., :3].astype(np.float32)
+        flat = rgb * (0.35 + 0.65 * max(0.0, light[2]))
+        lit = rgb * (0.35 + 0.65 * np.clip(n @ light, 0.0, 1.0))[..., None]
+        glow = rgb * 0.25 + (ore_mask(rgba)[..., None] * rgb * 1.2 if GLOW_ORES.search(name) else 0.0)
+        tiles = [rgb, np.repeat(h[..., None] * 255.0, 3, axis=-1), flat, lit, glow]
+        rows.append((name, [np.clip(t, 0, 255).astype(np.uint8) for t in tiles]))
+
+    tile, pad, label_w = 16 * scale, 6, 190
+    width = label_w + 5 * (tile + pad)
+    img = Image.new("RGB", (width, 24 + len(rows) * (tile + pad)), (18, 18, 22))
+    draw = ImageDraw.Draw(img)
+    for i, head in enumerate(["color", "heightmap", "flat lit", "with normals", "night (ore glow)"]):
+        draw.text((label_w + i * (tile + pad), 6), head, fill=(200, 200, 205))
+    for r, (name, tiles) in enumerate(rows):
+        y = 24 + r * (tile + pad)
+        draw.text((6, y + tile // 2 - 6), name, fill=(220, 220, 225))
+        for i, t in enumerate(tiles):
+            img.paste(Image.fromarray(t, "RGB").resize((tile, tile), Image.NEAREST),
+                      (label_w + i * (tile + pad), y))
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    img.save(path)
+    return path

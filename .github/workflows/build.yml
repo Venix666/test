@@ -14,7 +14,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install pillow pytest
-      - run: ./tools/fetch_vanilla.sh
+      - run: HALCYON_WITH_TEXTURES=1 ./tools/fetch_vanilla.sh
       - run: python -m pytest -q
       - run: python -m halcyon build
       - uses: actions/upload-artifact@v4

@@ -31,16 +31,21 @@ Override every vanilla Vibrant Visuals identifier, so every biome gets the new l
 - ✅ Presets: **Vibrant** (default) and **Cinematic**
 - ✅ Preview renderer (`python -m halcyon preview`) for sky/sun curves without the game
 
-## Phase 2 — Integrated PBR ⏳
-Vanilla Vibrant Visuals ships MERS maps but almost no normal maps (19 of ~1,300 blocks).
-- ⏳ Procedural heightmaps for every block from its color texture (Complementary-style "integrated PBR")
-- ⏳ MERS upgrades: glowing ores, polished metals, glossy glass/ice, subsurface foliage
-- ⏳ Per-material rules table + opt-out list; build flag `--pbr`
+## Phase 2 — Integrated PBR ✅
+Vanilla 26.60 authors MERS (metal, roughness, subsurface, light-source emissive) for every
+block but normal maps for only 4 of 1,293. Shipped as a separate **Halcyon PBR** add-on so the
+atmosphere presets still stack with any texture pack.
+- ✅ Procedural heightmaps for 1,289 blocks from their color textures (Complementary-style "integrated PBR")
+- ✅ Material rules table: flat (glass, concrete, wool), foliage, rough (stone, logs, ores), bricks by saturation, raised ore specks
+- ✅ Glowing ores (diamond, emerald, lapis, redstone, gold, copper, iron, quartz); `--no-glowing-ores` to opt out
+- ✅ Contact-sheet preview (`docs/previews/pbr.png`)
+- ⏳ In-game check of heightmap strength and ore glow level (moved to Phase 3 tuning pass)
+- ⏳ Optional higher-detail normals (2× upscaled height with smoothing) if in-game results look too blocky
 
 ## Phase 3 — Biome Water & In-Game Tuning ⏳
 - ⏳ Per-biome water (murky swamps, clear tropical oceans, frozen seas) via generated client_biome files
 - ⏳ Custom caustics texture
-- ⏳ In-game tuning pass with a screenshot checklist (noon, golden hour, night, rain, caves, each family)
+- ⏳ In-game tuning pass with a screenshot checklist (noon, golden hour, night, rain, caves, each family, PBR strength, ore glow)
 
 ## Phase 4 — Presets & UX ⏳
 - ⏳ Verify subpacks work for Vibrant Visuals configs; if so, ship one pack with preset selector

@@ -28,6 +28,12 @@ while staying official, cross-platform and update-proof.
 - **Validation** mirrors the documented ranges; out-of-range values fail the build.
 - **Presets** are separate packs with their own deterministic UUIDs (subpacks are Phase 4,
   pending in-game verification).
+- **PBR is a separate add-on pack.** Texture sets may only reference images in their own pack,
+  so the PBR pack carries copies of the vanilla color and MERS images next to the generated
+  heightmaps. Keeping it separate lets the atmosphere presets work with any texture pack.
+  Built `.mcpack` files therefore contain Mojang textures; the repository does not.
+- **Vanilla MERS is kept.** Mojang already authors metalness, roughness, subsurface and
+  light-source emissive per block; Halcyon only adds heightmaps and the faint ore glow.
 
 ## Format facts (from bedrock-samples v1.26.60.5 docs + vanilla data)
 - Manifest: `"capabilities": ["pbr"]`, `min_engine_version` ≥ 1.21.120.

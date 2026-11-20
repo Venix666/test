@@ -7,12 +7,13 @@ import json
 import shutil
 import uuid
 import zipfile
+from dataclasses import dataclass
 from pathlib import Path
 
 from . import __version__
 from .gen import generate
 from .limits import validate
-from .style import Look
+from .style import VIBRANT, Look
 from .vanilla import Vanilla
 
 NAMESPACE = uuid.UUID("6f1d3c52-8a4e-4f0b-9d2a-1c7e5b9a4d10")
@@ -23,8 +24,21 @@ def version_tuple(version: str = __version__) -> list[int]:
     return [int(x) for x in version.split(".")]
 
 
-def manifest(look: Look, version: str = __version__) -> dict:
-    """Stable UUIDs per preset so updates replace the installed pack."""
+@dataclass(frozen=True)
+class PackInfo:
+    name: str
+    title: str
+    description: str
+
+
+PBR_INFO = PackInfo(
+    "pbr", "PBR",
+    "Procedural heightmaps for every block and glowing ores. Stack above a Halcyon preset.",
+)
+
+
+def manifest(look: Look | PackInfo, version: str = __version__) -> dict:
+    """Stable UUIDs per pack so updates replace the installed pack."""
     v = version_tuple(version)
     return {
         "format_version": 2,
@@ -45,8 +59,8 @@ def manifest(look: Look, version: str = __version__) -> dict:
     }
 
 
-def pack_icon(look: Look) -> bytes:
-    """A 256x256 sunset-over-water icon drawn from the preset's own sky colors."""
+def pack_icon(look: Look, t: float = 0.245) -> bytes:
+    """A 256x256 sun-over-water icon drawn from the preset's own sky colors (t = time of day)."""
     from PIL import Image, ImageDraw, ImageFilter
 
     from .timeline import sample
@@ -54,7 +68,6 @@ def pack_icon(look: Look) -> bytes:
     size = 256
     img = Image.new("RGB", (size, size))
     px = img.load()
-    t = 0.245  # golden hour
     zen, hor = sample(look.zenith, t), sample(look.horizon, t)
     horizon_y = 160
     for y in range(horizon_y):
@@ -91,22 +104,30 @@ def build_pack(look: Look, vanilla: Vanilla, out_dir: Path, version: str = __ver
         except ValueError as e:
             raise ValueError(f"{look.name}/{path}: {e}") from e
 
-    out_dir = Path(out_dir)
-    folder = out_dir / f"Halcyon-{look.title}"
+    files = {p: _dump(d) for p, d in docs.items()}
+    return _write(look, files, pack_icon(look), Path(out_dir), version)
+
+
+def build_pbr_pack(vanilla: Vanilla, out_dir: Path, version: str = __version__,
+                   glowing_ores: bool = True) -> Path:
+    from .pbr import generate as generate_pbr
+
+    files = generate_pbr(vanilla, glowing_ores=glowing_ores)
+    return _write(PBR_INFO, files, pack_icon(VIBRANT, t=0.12), Path(out_dir), version)
+
+
+def _write(info: Look | PackInfo, files: dict[str, bytes], icon: bytes, out_dir: Path, version: str) -> Path:
+    folder = out_dir / f"Halcyon-{info.title}"
     if folder.exists():
         shutil.rmtree(folder)
     folder.mkdir(parents=True)
-    files: dict[str, bytes] = {
-        "manifest.json": _dump(manifest(look, version)),
-        "pack_icon.png": pack_icon(look),
-    }
-    files.update({p: _dump(d) for p, d in docs.items()})
+    files = {"manifest.json": _dump(manifest(info, version)), "pack_icon.png": icon, **files}
     for rel, data in sorted(files.items()):
         target = folder / rel
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(data)
 
-    archive = out_dir / f"Halcyon-{look.title}-v{version}.mcpack"
+    archive = out_dir / f"Halcyon-{info.title}-v{version}.mcpack"
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as z:
         for rel, data in sorted(files.items()):
             info = zipfile.ZipInfo(rel, date_time=(2026, 1, 1, 0, 0, 0))  # reproducible archives
