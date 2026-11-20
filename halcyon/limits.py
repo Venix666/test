@@ -10,6 +10,7 @@ import re
 TONEMAPPERS = {"aces", "hable", "reinhard", "reinhard_luma", "reinhard_luminance", "generic"}
 TEMPERATURE_TYPES = {"white_balance", "color_temperature"}
 _IDENT = re.compile(r"^[a-z0-9_.\-]+:[a-z0-9_.\-/]+$")
+_BLOCK = re.compile(r"^[a-z0-9_.\-]+:[0-9a-zA-Z_.\-]+$")  # block ids may be legacy camelCase (seaLantern)
 
 
 class ValidationError(ValueError):
@@ -90,6 +91,8 @@ class _Checker:
             "minecraft:color_grading_settings": self.color_grading,
             "minecraft:water_settings": self.water,
             "minecraft:fog_settings": self.fog,
+            "minecraft:local_light_settings": self.local_lights,
+            "minecraft:shadow_settings": self.shadows,
         }
         roots = [k for k in doc if k in handlers]
         if len(roots) != 1:
@@ -97,8 +100,27 @@ class _Checker:
             return
         self.version(doc)
         settings = doc[roots[0]]
-        self.identifier(roots[0], settings)
+        if roots[0] not in ("minecraft:local_light_settings", "minecraft:shadow_settings"):
+            self.identifier(roots[0], settings)
         handlers[roots[0]](roots[0], settings)
+
+    def local_lights(self, p, s):
+        if not s:
+            self.fail(p, "no blocks")
+        for block, entry in s.items():
+            if not _BLOCK.match(block):
+                self.fail(f"{p}.{block}", "block name must be namespaced")
+            if entry.get("light_type") not in ("static_light", "point_light"):
+                self.fail(f"{p}.{block}.light_type", f"got {entry.get('light_type')!r}")
+            if "light_color" in entry:
+                self.color(f"{p}.{block}.light_color", entry["light_color"])
+
+    def shadows(self, p, s):
+        style = s.get("shadow_style")
+        if style not in ("blocky_shadows", "soft_shadows"):
+            self.fail(f"{p}.shadow_style", f"got {style!r}")
+        if "texel_size" in s and (not isinstance(s["texel_size"], int) or s["texel_size"] < 1):
+            self.fail(f"{p}.texel_size", "must be a positive integer")
 
     def lighting(self, p, s):
         dl = s.get("directional_lights", {})
@@ -187,8 +209,8 @@ class _Checker:
         wv = s.get("waves", {})
         ranges = {"depth": (0.0, 3.0), "direction_increment": (0.0, 360.0), "frequency": (0.01, 3.0),
                   "frequency_scaling": (0.0, 2.0), "mix": (0.0, 1.0), "octaves": (1, 30),
-                  "pull": (-1.0, 1.0), "shape": (1.0, 10.0), "speed": (0.01, 10.0),
-                  "speed_scaling": (0.0, 2.0)}
+                  "pull": (-1.0, 1.0), "sampleWidth": (0.01, 1.0), "shape": (1.0, 10.0),
+                  "speed": (0.01, 10.0), "speed_scaling": (0.0, 2.0)}
         for key, (lo, hi) in ranges.items():
             if key in wv:
                 self.number(f"{p}.waves.{key}", wv[key], lo, hi)
@@ -207,10 +229,16 @@ class _Checker:
             self.number(f"{p}.density.zero_density_height", hi, -64, 320)
             if hi < lo:
                 self.fail(f"{p}.density", "zero_density_height below max_density_height")
-        m = vol.get("media_coefficients", {}).get("air")
-        if m:
-            self.vec3(f"{p}.media.scattering", m.get("scattering"), 0.0, 1.0)
-            self.vec3(f"{p}.media.absorption", m.get("absorption"), 0.0, 1.0)
-        g = vol.get("henyey_greenstein_g", {}).get("air")
-        if g:
-            self.number(f"{p}.henyey_greenstein_g", g.get("henyey_greenstein_g"), -1.0, 1.0)
+        w = vol.get("density", {}).get("water")
+        if w:
+            self.number(f"{p}.density.water.max_density", w.get("max_density", 0), 0.0, 1.0)
+            if "uniform" in w and not isinstance(w["uniform"], bool):
+                self.fail(f"{p}.density.water.uniform", "must be a boolean")
+        for medium in ("air", "water"):
+            m = vol.get("media_coefficients", {}).get(medium)
+            if m:
+                self.vec3(f"{p}.media.{medium}.scattering", m.get("scattering"), 0.0, 1.0)
+                self.vec3(f"{p}.media.{medium}.absorption", m.get("absorption"), 0.0, 1.0)
+            g = vol.get("henyey_greenstein_g", {}).get(medium)
+            if g:
+                self.number(f"{p}.henyey_greenstein_g.{medium}", g.get("henyey_greenstein_g"), -1.0, 1.0)

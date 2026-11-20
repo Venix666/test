@@ -1,4 +1,4 @@
-"""Integrated PBR: procedural heightmaps and glowing ores for every vanilla block.
+"""Integrated PBR: procedural heightmaps, glowing ores and emissive upgrades.
 
 Vanilla Vibrant Visuals already authors metalness, roughness, subsurface and
 light-source emissive (MERS) for each block, but ships normal maps for only a
@@ -38,6 +38,7 @@ class Rule:
 RULES: list[Rule] = [
     Rule(r"(^|/)brick$|mud_bricks", 0.7, "saturation"),  # light mortar sits lower than the bricks
     Rule(r"_ore$|ancient_debris", 0.8, "ore"),
+    Rule(r"^magma$", 0.7, "inv_luma"),  # glowing cracks sit below the crust
     Rule(r"glass|ice$|ice_|^ice|concrete(?!_powder)|wool|carpet|snow|slime|honey|portal|beacon|"
          r"shulker|smooth|water|lava|frosted", 0.12),
     Rule(r"glazed_terracotta", 0.25),
@@ -49,8 +50,52 @@ RULES: list[Rule] = [
     Rule(r".*", 0.5),
 ]
 
-GLOW_ORES = re.compile(r"(diamond|emerald|lapis|redstone|gold|copper|iron|quartz)_ore")
 ORE_EMISSIVE = 24  # vanilla glowstone sits at 21-41, so ores stay a faint sparkle
+
+
+@dataclass(frozen=True)
+class Glow:
+    pattern: str
+    mode: str  # bright (brightest pixels) | feature (pixels unlike the host) | all
+    value: int  # peak emissive, 0-255
+    ore: bool = False
+
+
+# Euphoria-style emissives for light sources that vanilla leaves dull. First match wins.
+GLOW_RULES: list[Glow] = [
+    Glow(r"(diamond|emerald|lapis|redstone|gold|copper|iron|quartz)_ore", "feature", ORE_EMISSIVE, ore=True),
+    Glow(r"candles/\w*candle_lit$", "bright", 48),
+    Glow(r"amethyst_cluster|amethyst_bud", "bright", 36),
+    Glow(r"crying_obsidian", "feature", 48),
+    Glow(r"^magma$", "bright", 40),
+    Glow(r"^glow_lichen$", "bright", 40),
+    Glow(r"^sculk$|^sculk_vein$|^sculk_catalyst", "feature", 20),
+    Glow(r"^(soul_)?fire_[01]$", "bright", 40),
+    Glow(r"^portal$", "all", 30),
+]
+GLOW_ORES = re.compile(GLOW_RULES[0].pattern)
+
+
+def glow_rule(name: str) -> Glow | None:
+    return next((g for g in GLOW_RULES if re.search(g.pattern, name)), None)
+
+
+def bright_mask(rgba: np.ndarray) -> np.ndarray:
+    """0..1 ramp over the brightest 40% of opaque pixels."""
+    luma = rgba[..., :3].astype(np.float32) @ np.array([0.2126, 0.7152, 0.0722], dtype=np.float32)
+    alpha = rgba[..., 3] > 0
+    if not alpha.any():
+        return np.zeros(luma.shape, np.float32)
+    lo, hi = np.percentile(luma[alpha], 60), luma[alpha].max()
+    return np.clip((luma - lo) / max(hi - lo, 1e-3), 0.0, 1.0) * alpha
+
+
+def glow_mask(rule: Glow, rgba: np.ndarray) -> np.ndarray:
+    if rule.mode == "bright":
+        return bright_mask(rgba)
+    if rule.mode == "feature":
+        return ore_mask(rgba)
+    return (rgba[..., 3] > 0).astype(np.float32)
 
 
 def rule_for(name: str) -> Rule:
@@ -105,13 +150,13 @@ def _png(arr: np.ndarray, mode: str) -> bytes:
     return buf.getvalue()
 
 
-def _glow(mers_path: Path, color_rgba: np.ndarray) -> bytes:
+def _glow(mers_path: Path, color_rgba: np.ndarray, rule: Glow) -> bytes:
     img = Image.open(mers_path)
     mode = "RGBA" if img.mode in ("RGBA", "LA", "P") else "RGB"
     mers = np.array(img.convert(mode))
     if mers.shape[:2] != color_rgba.shape[:2]:
         return mers_path.read_bytes()
-    glow = np.round(ore_mask(color_rgba) * ORE_EMISSIVE).astype(np.uint8)
+    glow = np.round(glow_mask(rule, color_rgba) * rule.value).astype(np.uint8)
     mers[..., 1] = np.maximum(mers[..., 1], glow)
     buf = io.BytesIO()
     Image.fromarray(mers, mode).save(buf, "TGA" if mers_path.suffix == ".tga" else "PNG")
@@ -122,7 +167,7 @@ def textures_root(vanilla: Vanilla) -> Path:
     return vanilla.pack / "textures" / "blocks"
 
 
-def generate(vanilla: Vanilla, glowing_ores: bool = True) -> dict[str, bytes]:
+def generate(vanilla: Vanilla, glowing_ores: bool = True, emissives: bool = True) -> dict[str, bytes]:
     """Return {pack-relative path: file bytes} for the PBR add-on pack."""
     root = textures_root(vanilla)
     if not root.is_dir():
@@ -154,8 +199,9 @@ def generate(vanilla: Vanilla, glowing_ores: bool = True) -> dict[str, bytes]:
                 mers_path = find_image(folder, mers_ref)
                 if mers_path is None:
                     continue
-                data = (_glow(mers_path, rgba) if glowing_ores and GLOW_ORES.search(key)
-                        else mers_path.read_bytes())
+                rule = glow_rule(key)
+                wanted = rule is not None and (glowing_ores if rule.ore else emissives)
+                data = _glow(mers_path, rgba, rule) if wanted else mers_path.read_bytes()
                 out[f"{rel_dir}/{mers_path.name}"] = data
         height_name = f"{name}_heightmap"
         new_ts["heightmap"] = height_name

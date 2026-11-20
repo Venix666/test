@@ -35,15 +35,27 @@ while staying official, cross-platform and update-proof.
 - **Vanilla MERS is kept.** Mojang already authors metalness, roughness, subsurface and
   light-source emissive per block; Halcyon only adds heightmaps and the faint ore glow.
 
-## Format facts (from bedrock-samples v1.26.60.5 docs + vanilla data)
+- **Colored light uses shared families.** Mojang recommends reusing few light colors for
+  performance; 106 blocks map to 42 colors. Block ids are checked against vanilla
+  `blocks.json` (note legacy ids such as `seaLantern`). Point lights stay limited to the
+  built-in set plus the conduit, because they are expensive on mobile.
+- **Optional looks ship as tiny add-ons** (Pixel Shadows) stacked above a preset, so players
+  toggle them without a rebuild.
+
+## Format facts (bedrock-samples v1.26.60.5 + MicrosoftDocs/minecraft-creator)
 - Manifest: `"capabilities": ["pbr"]`, `min_engine_version` ≥ 1.21.120.
 - Keyframe time is a 0–1 day fraction: 0.0 noon, 0.25 sunset, 0.5 midnight, 0.75 sunrise.
   Vanilla hands the shadow caster from sun to moon at 0.292 / 0.708.
 - `color_temperature` grading: higher Kelvin → cooler image (vanilla desert 4400 K,
   ice spikes 11000 K). The docs' wording is inverted; vanilla data is authoritative.
-- Format versions used: lighting 1.21.80 (`directional_lights.orbital`), atmospherics
-  1.21.40, color grading 1.21.90, fog 1.21.90 (`volumetric`), water 1.21.120,
-  texture sets 1.21.30 (`metalness_emissive_roughness_subsurface`).
+- Format versions used: lighting 1.26.0 (keyframed ambient/sky), atmospherics 1.21.40,
+  color grading 1.21.90, fog 1.21.90 (`volumetric` air + water media), water 1.26.0
+  (`biome_water_color_contribution`), local lighting 1.21.120, shadows 1.21.80,
+  texture sets 1.21.30 (`metalness_emissive_roughness_subsurface`). Packs need
+  `min_engine_version` 1.26.0.
+- Can't blend between biomes, so must match pack-wide: tonemapper, orbital offset,
+  water caustics, waves on/off.
+- Volumetric absorption uses only the luminance of the RGB value.
 - Volumetric fog: `density.air {max_density, max_density_height, zero_density_height}`,
   `media_coefficients.air {scattering, absorption}`, `henyey_greenstein_g.air`.
 

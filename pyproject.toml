@@ -1,6 +1,6 @@
 [project]
 name = "halcyon-visuals"
-version = "0.1.0"
+version = "0.2.0"
 description = "Generator for Halcyon Visuals, a Vibrant Visuals resource pack for Minecraft Bedrock"
 requires-python = ">=3.10"
 dependencies = ["pillow>=10"]

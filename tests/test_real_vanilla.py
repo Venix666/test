@@ -27,7 +27,8 @@ def test_every_biome_resolves_to_halcyon_settings(look, real_vanilla, caplog):
     provided = {}
     for doc in docs.values():
         root = next(k for k in doc if k.startswith("minecraft:"))
-        provided.setdefault(root, set()).add(doc[root]["description"]["identifier"])
+        if "description" in doc[root]:  # local lighting and shadows are pack-wide, unnamed
+            provided.setdefault(root, set()).add(doc[root]["description"]["identifier"])
 
     for biome in real_vanilla.client_biomes():
         for component, (field, root) in KINDS.items():
@@ -51,3 +52,13 @@ def test_pbr_texture_sets_only_reference_files_in_the_pack(real_vanilla):
         folder = path.rsplit("/", 1)[0]
         for ref in doc["minecraft:texture_set"].values():
             assert f"{folder}/{ref}" in stems, f"{path} → {ref}"
+
+
+def test_every_light_palette_block_exists_in_vanilla(real_vanilla):
+    from halcyon import lights
+
+    known = real_vanilla.known_blocks()
+    if known is None:
+        pytest.skip("blocks.json not fetched")
+    missing = sorted(set(lights.palette()) - known)
+    assert not missing, missing

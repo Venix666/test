@@ -38,6 +38,12 @@ class Fog:
     g: float = 0.75  # Henyey-Greenstein: >0 scatters forward = god rays toward the sun
     max_height: float = 63.0  # full density at/below this Y
     zero_height: float = 240.0  # fades to zero at this Y
+    # Underwater medium: light shafts below the surface. Vibrant Visuals uses only the
+    # luminance of absorption, so absorption sets murkiness, not tint.
+    water_density: float = 0.22
+    water_scattering: tuple = (0.016, 0.022, 0.030)
+    water_absorption: tuple = (0.12, 0.08, 0.08)
+    water_g: float = 0.85
 
 
 @dataclass(frozen=True)
@@ -81,6 +87,8 @@ class Look:
     otherworld_saturation: float = 1.2  # Nether/End colors derived from vanilla
     nether_ambient: tuple = ((255, 178, 140), 0.35)
     end_ambient: tuple = ((205, 175, 255), 0.4)
+    light_saturation: float = 1.0  # colored block light: 0 = vanilla-white, >1 = more vivid
+    shadow_style: str = "soft"  # soft | blocky (pixel shadows snapped to 16px texels)
 
 
 # Fog identifier (without namespace) → profile name. First match wins; None keeps vanilla.
@@ -180,10 +188,14 @@ VIBRANT = Look(
     },
     fogs={
         "temperate": Fog(0.045, (0.040, 0.046, 0.056), g=0.78),
-        "ocean": Fog(0.035, (0.038, 0.046, 0.058), g=0.75, zero_height=200.0),
-        "cold": Fog(0.025, (0.045, 0.050, 0.058), g=0.72, zero_height=260.0),
-        "humid": Fog(0.07, (0.060, 0.064, 0.060), g=0.6, zero_height=200.0),
-        "swamp": Fog(0.09, (0.060, 0.065, 0.055), (0.20, 0.12, 0.18), g=0.45, max_height=62.0, zero_height=140.0),
+        "ocean": Fog(0.035, (0.038, 0.046, 0.058), g=0.75, zero_height=200.0, water_density=0.18,
+                     water_absorption=(0.08, 0.06, 0.06), water_g=0.88),
+        "cold": Fog(0.025, (0.045, 0.050, 0.058), g=0.72, zero_height=260.0, water_scattering=(0.014, 0.022, 0.034)),
+        "humid": Fog(0.07, (0.060, 0.064, 0.060), g=0.6, zero_height=200.0, water_density=0.3,
+                     water_scattering=(0.020, 0.026, 0.024), water_absorption=(0.2, 0.16, 0.12)),
+        "swamp": Fog(0.09, (0.060, 0.065, 0.055), (0.20, 0.12, 0.18), g=0.45, max_height=62.0, zero_height=140.0,
+                     water_density=0.45, water_scattering=(0.030, 0.032, 0.022), water_absorption=(0.35, 0.30, 0.20),
+                     water_g=0.6),
         "dark_forest": Fog(0.07, (0.050, 0.055, 0.050), g=0.82, zero_height=180.0),
         "desert": Fog(0.03, (0.060, 0.050, 0.036), (0.0, 0.01, 0.03), g=0.7, zero_height=220.0),
         "mesa": Fog(0.035, (0.065, 0.048, 0.032), (0.0, 0.015, 0.035), g=0.7, zero_height=220.0),
@@ -209,6 +221,7 @@ def _cinematic() -> Look:
         ambient_illuminance=mirror({0.0: 0.035, 0.25: 0.03, 0.32: 0.02, 0.5: 0.02}),
         sun_mie=remap(v.sun_mie, lambda x: min(1.0, x * 1.15)),
         midtones={**v.midtones, "contrast": 1.3, "saturation": 1.06},
+        light_saturation=0.9,
         highlights={**v.highlights, "gain": [1.05, 1.0, 0.93]},
         shadows={**v.shadows, "gain": [0.92, 0.97, 1.08], "saturation": 1.0},
         temperature=6000,

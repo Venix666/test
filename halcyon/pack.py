@@ -17,7 +17,7 @@ from .style import VIBRANT, Look
 from .vanilla import Vanilla
 
 NAMESPACE = uuid.UUID("6f1d3c52-8a4e-4f0b-9d2a-1c7e5b9a4d10")
-MIN_ENGINE = [1, 21, 120]  # Vibrant Visuals pack customization requires >= 1.21.120
+MIN_ENGINE = [1, 26, 0]  # 1.26.0 schemas: keyframed ambient/sky, biome water color
 
 
 def version_tuple(version: str = __version__) -> list[int]:
@@ -33,7 +33,11 @@ class PackInfo:
 
 PBR_INFO = PackInfo(
     "pbr", "PBR",
-    "Procedural heightmaps for every block and glowing ores. Stack above a Halcyon preset.",
+    "Procedural heightmaps for every block, glowing ores and emissive upgrades. Stack above a Halcyon preset.",
+)
+PIXEL_SHADOWS_INFO = PackInfo(
+    "pixel_shadows", "Pixel Shadows",
+    "Blocky shadows snapped to the 16px texel grid. Stack above a Halcyon preset.",
 )
 
 
@@ -109,15 +113,26 @@ def build_pack(look: Look, vanilla: Vanilla, out_dir: Path, version: str = __ver
 
 
 def build_pbr_pack(vanilla: Vanilla, out_dir: Path, version: str = __version__,
-                   glowing_ores: bool = True) -> Path:
+                   glowing_ores: bool = True, emissives: bool = True) -> Path:
     from .pbr import generate as generate_pbr
 
-    files = generate_pbr(vanilla, glowing_ores=glowing_ores)
+    files = generate_pbr(vanilla, glowing_ores=glowing_ores, emissives=emissives)
     return _write(PBR_INFO, files, pack_icon(VIBRANT, t=0.12), Path(out_dir), version)
 
 
+def build_pixel_shadows_pack(out_dir: Path, version: str = __version__) -> Path:
+    from .gen import FORMAT
+    from .lights import shadows
+
+    doc = {"format_version": FORMAT["shadows"], **shadows("blocky")}
+    validate(doc)
+    return _write(PIXEL_SHADOWS_INFO, {"shadows/global.json": _dump(doc)}, pack_icon(VIBRANT, t=0.2),
+                  Path(out_dir), version)
+
+
 def _write(info: Look | PackInfo, files: dict[str, bytes], icon: bytes, out_dir: Path, version: str) -> Path:
-    folder = out_dir / f"Halcyon-{info.title}"
+    slug = info.title.replace(" ", "")
+    folder = out_dir / f"Halcyon-{slug}"
     if folder.exists():
         shutil.rmtree(folder)
     folder.mkdir(parents=True)
@@ -127,7 +142,7 @@ def _write(info: Look | PackInfo, files: dict[str, bytes], icon: bytes, out_dir:
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(data)
 
-    archive = out_dir / f"Halcyon-{info.title}-v{version}.mcpack"
+    archive = out_dir / f"Halcyon-{slug}-v{version}.mcpack"
     with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as z:
         for rel, data in sorted(files.items()):
             info = zipfile.ZipInfo(rel, date_time=(2026, 1, 1, 0, 0, 0))  # reproducible archives

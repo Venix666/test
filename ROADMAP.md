@@ -42,6 +42,20 @@ atmosphere presets still stack with any texture pack.
 - ⏳ In-game check of heightmap strength and ore glow level (moved to Phase 3 tuning pass)
 - ⏳ Optional higher-detail normals (2× upscaled height with smoothing) if in-game results look too blocky
 
+## Phase 2.5 — Advanced Lighting ✅
+Every lighting control Mojang exposes to packs, pushed toward Rethinking Voxels / Euphoria.
+- ✅ Colored block light for 106 light-emitting blocks in shared light families (fire, soul, redstone,
+  sea, End, portal/amethyst, sculk, copper, froglights); dyed candles cast a hint of their color
+- ✅ Point lights (dynamic shadows + specular): all built-in ones recolored, conduit added
+- ✅ Underwater volumetric light shafts per biome (crisp in clear oceans, murky in swamps)
+- ✅ Emissive upgrades in the PBR add-on: crying obsidian, amethyst, magma, glow lichen, sculk,
+  lit candles, fire, nether portal, ores (`--no-emissives` / `--no-glowing-ores`)
+- ✅ **Pixel Shadows** add-on: blocky shadows snapped to the 16px texel grid
+- ✅ Fixes from the official docs: lighting and water schemas → 1.26.0 (keyframed ambient/sky,
+  biome water color), one sun-path tilt across all lighting files
+- ✅ Light-palette preview (`docs/previews/lights.png`)
+- ⏳ In-game: point-light cost on mobile, light colors, emissive levels (Phase 3 tuning pass)
+
 ## Phase 3 — Biome Water & In-Game Tuning ⏳
 - ⏳ Per-biome water (murky swamps, clear tropical oceans, frozen seas) via generated client_biome files
 - ⏳ Custom caustics texture
@@ -53,8 +67,9 @@ atmosphere presets still stack with any texture pack.
 - ⏳ Store pages (CurseForge / MCPEDL / Modrinth), screenshots, changelog
 
 ## Phase 5 — PC "Ultra" layer 🔬
-Effects JSON cannot express (custom clouds, colored light bounce à la Rethinking Voxels,
-custom shadow filtering, DoF). Requires BetterRenderDragon + compiled RenderDragon materials;
+Effects packs cannot express: colored light *bounce* (global illumination à la Rethinking
+Voxels), handheld dynamic lights, light reach/brightness of vanilla blocks (behavior-side),
+custom clouds, shadow filtering beyond soft/blocky, DoF. Requires BetterRenderDragon + compiled RenderDragon materials;
 Windows only, breaks on updates. Go/no-go after a spike.
 
 ## Known limits of the official route

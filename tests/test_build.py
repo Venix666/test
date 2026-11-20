@@ -48,7 +48,8 @@ def test_fog_profiles(ident, profile):
 def test_nether_lighting_is_derived_in_orbital_layout(vanilla):
     doc = generate(VIBRANT, vanilla)["lighting/nether_lighting.json"]
     s = doc["minecraft:lighting_settings"]
-    assert doc["format_version"] == "1.21.80"
+    assert doc["format_version"] == "1.26.0"
+    assert s["directional_lights"]["orbital"]["orbital_offset_degrees"] == VIBRANT.orbital_offset
     assert set(s["directional_lights"]["orbital"]) >= {"sun", "moon"}
     assert "sun" not in s["directional_lights"]
     r, g, b = s["ambient"]["color"]

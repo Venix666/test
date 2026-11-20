@@ -52,6 +52,13 @@ class Vanilla:
             out.append(Entry(path.name, ident, doc))
         return out
 
+    def known_blocks(self) -> set[str] | None:
+        """Vanilla block names (no namespace) from blocks.json, or None if not fetched."""
+        path = self.pack / "blocks.json"
+        if not path.is_file():
+            return None
+        return {k for k in load_json(path) if k != "format_version"}
+
     def client_biomes(self) -> list[dict]:
         out = []
         for path in sorted((self.pack / "biomes").glob("*.client_biome.json")):

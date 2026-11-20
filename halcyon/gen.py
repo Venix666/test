@@ -10,6 +10,7 @@ import copy
 import logging
 import re
 
+from . import lights
 from .color import hex_to_rgb, mix, saturate, tint
 from .style import END, FOG_RULES, NETHER, Family, Fog, Look
 from .timeline import keyframes
@@ -18,11 +19,13 @@ from .vanilla import Vanilla
 log = logging.getLogger(__name__)
 
 FORMAT = {
-    "lighting": "1.21.80",
+    "lighting": "1.26.0",  # keyframed ambient + sky need 1.26.0
     "atmospherics": "1.21.40",
     "color_grading": "1.21.90",
-    "water": "1.21.120",
+    "water": "1.26.0",  # biome_water_color_contribution needs 1.26.0
     "fogs": "1.21.90",
+    "local_lighting": "1.21.120",
+    "shadows": "1.21.80",
 }
 SUFFIX = {"lighting": "_lighting", "atmospherics": "_atmospherics", "color_grading": "_color_grading"}
 
@@ -53,6 +56,11 @@ def generate(look: Look, vanilla: Vanilla) -> dict[str, dict]:
         doc = _fog(look, entry)
         if doc is not None:
             out[f"fogs/{entry.filename}"] = doc
+    out["local_lighting/local_lighting.json"] = {
+        "format_version": FORMAT["local_lighting"],
+        **lights.local_lighting(look.light_saturation, vanilla.known_blocks()),
+    }
+    out["shadows/global.json"] = {"format_version": FORMAT["shadows"], **lights.shadows(look.shadow_style)}
     return out
 
 
@@ -92,6 +100,8 @@ def _derived_lighting(look: Look, entry, kind: str) -> dict:
     lights = s.setdefault("directional_lights", {})
     if "orbital" not in lights:  # 1.21.70 layout → 1.21.80 orbital layout
         lights["orbital"] = {k: lights.pop(k) for k in ("sun", "moon", "orbital_offset_degrees") if k in lights}
+    # Orbital offset can't blend between biomes: every lighting file in a pack must share it.
+    lights["orbital"]["orbital_offset_degrees"] = look.orbital_offset
     target, amount = look.nether_ambient if kind == "nether" else look.end_ambient
     ambient = s.setdefault("ambient", {"color": [255, 255, 255], "illuminance": 0.1})
     ambient["color"] = _map_colors(ambient.get("color", [255, 255, 255]), lambda c: mix(c, target, amount))
@@ -208,10 +218,16 @@ def _fog(look: Look, entry) -> dict | None:
     doc = copy.deepcopy(entry.doc)
     doc["format_version"] = FORMAT["fogs"]
     doc["minecraft:fog_settings"]["volumetric"] = {
-        "density": {"air": {"max_density": f.density, "max_density_height": f.max_height,
-                            "zero_density_height": f.zero_height}},
-        "media_coefficients": {"air": {"scattering": list(f.scattering), "absorption": list(f.absorption)}},
-        "henyey_greenstein_g": {"air": {"henyey_greenstein_g": f.g}},
+        "density": {
+            "air": {"max_density": f.density, "max_density_height": f.max_height,
+                    "zero_density_height": f.zero_height},
+            "water": {"max_density": f.water_density, "uniform": True},
+        },
+        "media_coefficients": {
+            "air": {"scattering": list(f.scattering), "absorption": list(f.absorption)},
+            "water": {"scattering": list(f.water_scattering), "absorption": list(f.water_absorption)},
+        },
+        "henyey_greenstein_g": {"air": {"henyey_greenstein_g": f.g}, "water": {"henyey_greenstein_g": f.water_g}},
     }
     return doc
 

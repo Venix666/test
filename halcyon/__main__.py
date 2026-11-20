@@ -29,6 +29,7 @@ def main(argv: list[str] | None = None) -> int:
     b.add_argument("--out", type=Path, default=Path("dist"))
     b.add_argument("--no-pbr", action="store_true", help="skip the PBR add-on pack")
     b.add_argument("--no-glowing-ores", action="store_true", help="PBR pack without ore glow")
+    b.add_argument("--no-emissives", action="store_true", help="PBR pack without emissive upgrades")
 
     p = sub.add_parser("preview", help="render day-cycle preview PNGs")
     p.add_argument("--preset", choices=choices, default="all")
@@ -43,23 +44,28 @@ def main(argv: list[str] | None = None) -> int:
         from .pack import build_pack
         from .vanilla import Vanilla
 
+        from .pack import build_pixel_shadows_pack
+
         vanilla = Vanilla(args.vanilla)
         for look in _presets(args.preset):
             print(build_pack(look, vanilla, args.out))
+        print(build_pixel_shadows_pack(args.out))
         if not args.no_pbr:
             if _has_textures(vanilla):
                 from .pack import build_pbr_pack
 
-                print(build_pbr_pack(vanilla, args.out, glowing_ores=not args.no_glowing_ores))
+                print(build_pbr_pack(vanilla, args.out, glowing_ores=not args.no_glowing_ores,
+                                     emissives=not args.no_emissives))
             else:
                 logging.warning("no block textures: skipping PBR pack "
                                 "(run HALCYON_WITH_TEXTURES=1 tools/fetch_vanilla.sh)")
     else:
-        from .preview import render, render_pbr
+        from .preview import render, render_lights, render_pbr
         from .vanilla import Vanilla
 
         for look in _presets(args.preset):
             print(render(look, args.out / f"{look.name}.png"))
+        print(render_lights(PRESETS["vibrant"], args.out / "lights.png"))
         try:
             vanilla = Vanilla(args.vanilla)
         except FileNotFoundError:

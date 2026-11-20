@@ -87,8 +87,9 @@ def render(look: Look, path: Path) -> Path:
     return path
 
 
-PBR_SAMPLES = ["stone", "cobblestone", "stonebrick", "brick", "planks_oak", "log_oak", "sandstone",
-               "deepslate/cobbled_deepslate", "diamond_ore", "redstone_ore", "gold_ore", "leaves_oak", "glass"]
+PBR_SAMPLES = ["stone", "cobblestone", "stonebrick", "brick", "planks_oak", "log_oak",
+               "deepslate/cobbled_deepslate", "diamond_ore", "redstone_ore", "gold_ore", "leaves_oak", "glass",
+               "crying_obsidian", "amethyst_cluster", "glow_lichen", "magma", "candles/red_candle_lit", "sculk"]
 
 
 def render_pbr(vanilla, path: Path, scale: int = 8) -> Path:
@@ -96,7 +97,7 @@ def render_pbr(vanilla, path: Path, scale: int = 8) -> Path:
     import numpy as np
     from PIL import Image, ImageDraw
 
-    from .pbr import GLOW_ORES, find_image, heightmap, ore_mask, rule_for, textures_root
+    from .pbr import find_image, glow_mask, glow_rule, heightmap, rule_for, textures_root
 
     root = textures_root(vanilla)
     light = np.array([-0.55, -0.6, 0.58])
@@ -116,7 +117,8 @@ def render_pbr(vanilla, path: Path, scale: int = 8) -> Path:
         rgb = rgba[..., :3].astype(np.float32)
         flat = rgb * (0.35 + 0.65 * max(0.0, light[2]))
         lit = rgb * (0.35 + 0.65 * np.clip(n @ light, 0.0, 1.0))[..., None]
-        glow = rgb * 0.25 + (ore_mask(rgba)[..., None] * rgb * 1.2 if GLOW_ORES.search(name) else 0.0)
+        g = glow_rule(name)
+        glow = rgb * 0.25 + (glow_mask(g, rgba)[..., None] * rgb * (0.4 + g.value / 40) if g else 0.0)
         tiles = [rgb, np.repeat(h[..., None] * 255.0, 3, axis=-1), flat, lit, glow]
         rows.append((name, [np.clip(t, 0, 255).astype(np.uint8) for t in tiles]))
 
@@ -124,7 +126,7 @@ def render_pbr(vanilla, path: Path, scale: int = 8) -> Path:
     width = label_w + 5 * (tile + pad)
     img = Image.new("RGB", (width, 24 + len(rows) * (tile + pad)), (18, 18, 22))
     draw = ImageDraw.Draw(img)
-    for i, head in enumerate(["color", "heightmap", "flat lit", "with normals", "night (ore glow)"]):
+    for i, head in enumerate(["color", "heightmap", "flat lit", "with normals", "night (emissive)"]):
         draw.text((label_w + i * (tile + pad), 6), head, fill=(200, 200, 205))
     for r, (name, tiles) in enumerate(rows):
         y = 24 + r * (tile + pad)
@@ -132,6 +134,42 @@ def render_pbr(vanilla, path: Path, scale: int = 8) -> Path:
         for i, t in enumerate(tiles):
             img.paste(Image.fromarray(t, "RGB").resize((tile, tile), Image.NEAREST),
                       (label_w + i * (tile + pad), y))
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    img.save(path)
+    return path
+
+
+def render_lights(look: Look, path: Path) -> Path:
+    """One swatch per light color: a dark wall lit by that block light, with the blocks using it."""
+    import numpy as np
+    from PIL import Image, ImageDraw
+
+    from . import lights
+
+    groups: dict[str, list[str]] = {}
+    for name, entry in lights.local_lighting(look.light_saturation)["minecraft:local_light_settings"].items():
+        tag = name.split(":", 1)[1] + ("*" if entry["light_type"] == "point_light" else "")
+        groups.setdefault(entry["light_color"], []).append(tag)
+    cols, sw, sh = 4, 300, 92
+    rows = (len(groups) + cols - 1) // cols
+    img = Image.new("RGB", (cols * sw, 28 + rows * sh), (14, 14, 18))
+    draw = ImageDraw.Draw(img)
+    draw.text((8, 8), f"Halcyon {look.title}: block light colors (* = point light: dynamic shadows)",
+              fill=(200, 200, 205))
+    yy, xx = np.mgrid[0:sh - 8, 0:sw - 8]
+    falloff = 1.0 / (1.0 + ((xx - 40) ** 2 + (yy - (sh - 8) / 2) ** 2) / 1800.0)
+    wall = np.full((sh - 8, sw - 8, 3), 52.0)
+    for i, (hexcolor, names) in enumerate(sorted(groups.items(), key=lambda kv: kv[1][0])):
+        rgb = np.array([int(hexcolor[j:j + 2], 16) for j in (1, 3, 5)], dtype=np.float32)
+        tile = np.clip(wall * 0.25 + wall * falloff[..., None] * rgb / 255.0 * 3.2, 0, 255).astype(np.uint8)
+        x, y = (i % cols) * sw + 4, 28 + (i // cols) * sh + 4
+        img.paste(Image.fromarray(tile, "RGB"), (x, y))
+        draw.ellipse((x + 34, y + (sh - 8) // 2 - 6, x + 46, y + (sh - 8) // 2 + 6), fill=tuple(int(c) for c in rgb))
+        label = ", ".join(names)
+        for k, line in enumerate([label[j:j + 34] for j in range(0, min(len(label), 102), 34)]):
+            draw.text((x + 62, y + 8 + k * 13), line, fill=(235, 235, 240))
+        draw.text((x + 62, y + sh - 26), hexcolor, fill=(170, 170, 180))
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     img.save(path)

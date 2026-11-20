@@ -18,6 +18,7 @@ fi
 
 git -C "$DEST" sparse-checkout set --no-cone \
   '/resource_pack/manifest.json' \
+  '/resource_pack/blocks.json' \
   '/resource_pack/atmospherics/' \
   '/resource_pack/color_grading/' \
   '/resource_pack/lighting/' \
